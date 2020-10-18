@@ -5,13 +5,17 @@ import MediaErrorSnackbar from './MediaErrorSnackbar/MediaErrorSnackbar';
 import PreflightTest from './PreflightTest/PreflightTest';
 import RoomNameScreen from './RoomNameScreen/RoomNameScreen';
 import { useAppState } from '../../state';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import useVideoContext from '../../hooks/useVideoContext/useVideoContext';
 import Video from 'twilio-video';
 
 export enum Steps {
   roomNameStep,
   deviceSelectionStep,
+}
+
+function useQuery() {
+  return new URLSearchParams(useLocation().search);
 }
 
 export default function PreJoinScreens() {
@@ -22,8 +26,15 @@ export default function PreJoinScreens() {
 
   const [name, setName] = useState<string>(user?.displayName || '');
   const [roomName, setRoomName] = useState<string>('');
+  const [token, setToken] = useState<string>('');
 
   const [mediaError, setMediaError] = useState<Error>();
+
+  let query = useQuery();
+
+  console.log(query.get('identity'));
+
+  const isAuthorisedLink = query.get('identity') && query.get('roomname') && query.get('token');
 
   useEffect(() => {
     if (URLRoomName) {
@@ -33,6 +44,17 @@ export default function PreJoinScreens() {
       }
     }
   }, [user, URLRoomName]);
+
+  useEffect(() => {
+    if (isAuthorisedLink) {
+      setName(query.get('identity') as string);
+      setRoomName(query.get('roomname') as string);
+      setToken(query.get('token') as string);
+      setTimeout(() => {
+        setStep(Steps.deviceSelectionStep);
+      });
+    }
+  }, [isAuthorisedLink, query]);
 
   useEffect(() => {
     if (step === Steps.deviceSelectionStep) {
@@ -73,7 +95,7 @@ export default function PreJoinScreens() {
       )}
 
       {step === Steps.deviceSelectionStep && (
-        <DeviceSelectionScreen name={name} roomName={roomName} setStep={setStep} />
+        <DeviceSelectionScreen name={name} roomName={roomName} setStep={setStep} token={token} />
       )}
     </IntroContainer>
   );
