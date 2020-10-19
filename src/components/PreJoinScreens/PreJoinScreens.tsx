@@ -32,8 +32,6 @@ export default function PreJoinScreens() {
 
   let query = useQuery();
 
-  console.log(query.get('identity'));
-
   const isAuthorisedLink = query.get('identity') && query.get('roomname') && query.get('token');
 
   useEffect(() => {
