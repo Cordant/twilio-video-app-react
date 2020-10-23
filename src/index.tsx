@@ -13,12 +13,23 @@ import PrivateRoute from './components/PrivateRoute/PrivateRoute';
 import theme from './theme';
 import './types';
 import { VideoProvider } from './components/VideoProvider';
-import useConnectionOptions from './utils/useConnectionOptions/useConnectionOptions';
 import UnsupportedBrowserWarning from './components/UnsupportedBrowserWarning/UnsupportedBrowserWarning';
+import { ConnectOptions } from 'twilio-video';
+import { isMobile } from './utils';
 
 const VideoApp = () => {
   const { error, setError } = useAppState();
-  const connectionOptions = useConnectionOptions();
+  // const connectionOptions = useConnectionOptions();
+  // for available connection options.
+  const connectionOptions: ConnectOptions = {
+    video: { height: 1080, frameRate: 24, width: 1920 },
+    maxAudioBitrate: 16000,
+  };
+
+  // For mobile browsers, limit the maximum incoming video bitrate to 2.5 Mbps.
+  if (isMobile && connectionOptions?.bandwidthProfile?.video) {
+    connectionOptions!.bandwidthProfile!.video!.maxSubscriptionBitrate = 2500000;
+  }
 
   return (
     <UnsupportedBrowserWarning>
