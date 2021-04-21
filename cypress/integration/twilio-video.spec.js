@@ -1,6 +1,6 @@
 /// <reference types="Cypress" />
 
-// If you are on MacOS and have many popups about Chromium when these tests run, please see: https://stackoverflow.com/questions/54545193/puppeteer-chromium-on-mac-chronically-prompting-accept-incoming-network-connect
+// If you are on MacOS and have many popups about Chromium when these tests run, please see: https://github.com/puppeteer/puppeteer/issues/4752
 
 // Creates a random string like 'ft68eyjn8i'
 const getRoomName = () =>
@@ -17,12 +17,19 @@ context('A video app user', () => {
       cy.get('#input-room-name').type(getRoomName());
       cy.get('[type="submit"]').click();
 
-      cy.get('clipPath rect')
-        .invoke('attr', 'y')
-        .should('be', 14);
-      cy.get('clipPath rect')
-        .invoke('attr', 'y')
-        .should('be.lessThan', 14);
+      // When the 'y' attribute is 14, it means that the audio indicator icon is showing that there is no sound.
+      cy.get('clipPath rect').should($rect => {
+        const y = $rect.attr('y');
+        expect(Number(y)).to.equal(14);
+      });
+
+      // When the 'y' attribute is less than 14, it means that the audio indicator icon is showing that there is sound.
+      // Since the indicator should be moving up and down with the audible beeps, 'y' should be 14 and less than 14 at
+      // different points of time. Cypress will continuously retry these assertions until they pass or timeout.
+      cy.get('clipPath rect').should($rect => {
+        const y = $rect.attr('y');
+        expect(Number(y)).to.be.lessThan(14);
+      });
     });
   });
 
@@ -57,11 +64,17 @@ context('A video app user', () => {
     it('should see the participants audio level indicator moving', () => {
       cy.getParticipant('test1')
         .get('clipPath rect')
-        .invoke('attr', 'y')
-        .should('be', 14);
-      cy.get('clipPath rect')
-        .invoke('attr', 'y')
-        .should('be.lessThan', 14);
+        .should($rect => {
+          const y = $rect.attr('y');
+          expect(Number(y)).to.equal(14);
+        });
+
+      cy.getParticipant('test1')
+        .get('clipPath rect')
+        .should($rect => {
+          const y = $rect.attr('y');
+          expect(Number(y)).to.be.lessThan(14);
+        });
     });
 
     it('should see other participants disconnect when they close their browser', () => {
@@ -92,6 +105,76 @@ context('A video app user', () => {
 
     it('should be able to hear the other participant', () => {
       cy.getParticipant('test1').shouldBeMakingSound();
+    });
+
+    describe('the chat feature', () => {
+      // Before we test the chat feature, we want to open the chat window and send enough messages
+      // to make the message list taller than its container so that we can test the scrolling behavior:
+      before(() => {
+        cy.get('[data-cy-chat-button]').click();
+      // Create an array with 15 values, then send a message when looping over each of them:
+        Array(15)
+          .fill(true)
+          .forEach((_, i) => {
+            cy.task('sendAMessage', {
+              name: 'test1',
+              message: 'welcome to the chat! - ' + i,
+            });
+          });
+      // Wait 1 second for the above to complete:
+        cy.wait(1000);
+        cy.contains('welcome to the chat! - 14');
+      });
+
+      after(() => {
+        cy.get('[data-cy-chat-button]').click();
+      });
+
+      it('should see "1 new message" button when not scrolled to bottom of chat and a new message is received', () => {
+        cy.get('[data-cy-message-list-inner-scroll]').scrollTo(0, 0);
+        cy.task('sendAMessage', { name: 'test1', message: 'how is it going?' });
+        cy.contains('1 new message').should('be.visible');
+      });
+
+      it('should scroll to bottom of chat when "1 new message button" is clicked on', () => {
+        cy.get('[data-cy-message-list-inner-scroll]').scrollTo(0, 0);
+        cy.task('sendAMessage', { name: 'test1', message: 'Ahoy!' });
+        cy.contains('Ahoy!');
+        cy.get('[data-cy-new-message-button]')
+          .should('be.visible')
+          .click();
+        cy.get('[data-cy-message-list-inner-scroll]')
+          .contains('Ahoy!')
+          .should('be.visible');
+
+        // Here we are checking if the chat window has scrolled all the way to the bottom.
+        // The following will be true if the scrolling container's scrollHeight property
+        // is equal to its 'scrollTop' plus its 'clientHeight' properties:
+        cy.get('[data-cy-message-list-inner-scroll]').should($el => {
+          expect($el.prop('scrollHeight')).to.equal($el.prop('scrollTop') + $el.prop('clientHeight'));
+        });
+      });
+
+      it('should not see "1 new message" button when manually scroll to bottom of chat after receiving new message', () => {
+        cy.get('[data-cy-message-list-inner-scroll]').scrollTo(0, 0);
+        cy.task('sendAMessage', { name: 'test1', message: 'chatting is fun!' });
+        cy.get('[data-cy-new-message-button]').should('be.visible');
+        cy.get('[data-cy-message-list-inner-scroll]').scrollTo('bottom');
+        cy.get('[data-cy-new-message-button]').should('not.be.visible');
+        cy.get('[data-cy-message-list-inner-scroll]')
+          .contains('chatting is fun!')
+          .should('be.visible');
+      });
+
+      it('should auto-scroll to bottom of chat when already scrolled to bottom and a new message is received', () => {
+        cy.get('[data-cy-message-list-inner-scroll]').scrollTo('bottom');
+        cy.task('sendAMessage', { name: 'test1', message: 'what a wonderful day!' });
+        cy.contains('what a wonderful day!');
+        // Check if chat window is scrolled to the bottom:
+        cy.get('[data-cy-message-list-inner-scroll]').should($el => {
+          expect($el.prop('scrollHeight')).to.equal($el.prop('scrollTop') + $el.prop('clientHeight'));
+        });
+      });
     });
   });
 

@@ -5,17 +5,17 @@ import useLocalVideoToggle from '../../../hooks/useLocalVideoToggle/useLocalVide
 import ToggleVideoButton from './ToggleVideoButton';
 import VideoOffIcon from '../../../icons/VideoOffIcon';
 import VideoOnIcon from '../../../icons/VideoOnIcon';
-import { useHasVideoInputDevices } from '../../../hooks/deviceHooks/deviceHooks';
+import useDevices from '../../../hooks/useDevices/useDevices';
 
-jest.mock('../../../hooks/deviceHooks/deviceHooks');
+jest.mock('../../../hooks/useDevices/useDevices');
 jest.mock('../../../hooks/useLocalVideoToggle/useLocalVideoToggle');
 
 const mockUseLocalVideoToggle = useLocalVideoToggle as jest.Mock<any>;
-const mockUseHasVideoInputDevices = useHasVideoInputDevices as jest.Mock<any>;
+const mockUseDevices = useDevices as jest.Mock<any>;
 
 describe('the ToggleVideoButton component', () => {
   beforeAll(() => {
-    mockUseHasVideoInputDevices.mockImplementation(() => true);
+    mockUseDevices.mockImplementation(() => ({ hasVideoInputDevices: true }));
   });
 
   it('should render correctly when video is enabled', () => {
@@ -34,7 +34,7 @@ describe('the ToggleVideoButton component', () => {
 
   it('should render correctly when no video devices exist', () => {
     mockUseLocalVideoToggle.mockImplementation(() => [true, () => {}]);
-    mockUseHasVideoInputDevices.mockImplementationOnce(() => false);
+    mockUseDevices.mockImplementationOnce(() => ({ hasVideoInputDevices: false }));
     const wrapper = shallow(<ToggleVideoButton />);
     expect(wrapper.prop('startIcon')).toEqual(<VideoOnIcon />);
     expect(wrapper.prop('disabled')).toEqual(true);
@@ -55,9 +55,9 @@ describe('the ToggleVideoButton component', () => {
     const wrapper = shallow(<ToggleVideoButton />);
     Date.now = () => 100000;
     wrapper.simulate('click'); // Should register
-    Date.now = () => 100100;
+    Date.now = () => 100500;
     wrapper.simulate('click'); // Should be ignored
-    Date.now = () => 100300;
+    Date.now = () => 100501;
     wrapper.simulate('click'); // Should register
     expect(mockFn).toHaveBeenCalledTimes(2);
   });
